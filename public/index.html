@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTMP to SRT Streamer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+        }
+        .rtmp-info {
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button.stop {
+            background-color: #f44336;
+        }
+        .slider-container {
+            margin: 20px 0;
+        }
+        .slider-value {
+            margin-top: 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>RTMP to SRT Streamer</h1>
+    <div class="rtmp-info">
+        <h3>RTMP Stream URL:</h3>
+        <p id="rtmpUrl">Loading...</p>
+    </div>
+    <div class="input-group">
+        <label for="srtUrl">SRT URL:</label>
+        <input type="text" id="srtUrl" value="srt://192.168.0.236:8282">
+    </div>
+    <div class="slider-container">
+        <label for="bitrate">Bitrate (kbps):</label>
+        <input type="range" id="bitrate" min="500" max="8000" step="500" value="2000">
+        <div class="slider-value">Current bitrate: <span id="bitrateValue">2000</span> kbps</div>
+    </div>
+    <button id="toggleStream">Start Streaming</button>
+    <div id="status"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const toggleButton = document.getElementById('toggleStream');
+            const rtmpUrlDisplay = document.getElementById('rtmpUrl');
+            const srtInput = document.getElementById('srtUrl');
+            const bitrateSlider = document.getElementById('bitrate');
+            const bitrateValue = document.getElementById('bitrateValue');
+            const statusDiv = document.getElementById('status');
+            let isStreaming = false;
+
+            bitrateSlider.addEventListener('input', (e) => {
+                bitrateValue.textContent = e.target.value;
+            });
+
+            const response = await fetch('/local-ip');
+            const data = await response.json();
+            rtmpUrlDisplay.textContent = `rtmp://${data.ip}:1935/live/test`;
+
+            toggleButton.addEventListener('click', async () => {
+                if (!isStreaming) {
+                    const srtUrl = srtInput.value;
+                    const bitrate = bitrateSlider.value;
+
+                    if (!srtUrl) {
+                        alert('Please enter SRT URL');
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch('/start-stream', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ 
+                                srtUrl,
+                                bitrate
+                            }),
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            isStreaming = true;
+                            toggleButton.textContent = 'Stop Streaming';
+                            toggleButton.classList.add('stop');
+                            statusDiv.textContent = 'Streaming active';
+                            bitrateSlider.disabled = true;
+                        }
+                    } catch (error) {
+                        alert('Failed to start streaming');
+                    }
+                } else {
+                    try {
+                        const response = await fetch('/stop-stream', {
+                            method: 'POST',
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            isStreaming = false;
+                            toggleButton.textContent = 'Start Streaming';
+                            toggleButton.classList.remove('stop');
+                            statusDiv.textContent = 'Stream stopped';
+                            bitrateSlider.disabled = false;
+                        }
+                    } catch (error) {
+                        alert('Failed to stop streaming');
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
